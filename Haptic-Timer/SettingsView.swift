@@ -6,6 +6,10 @@ struct SettingsView: View {
     @ObservedObject var viewModel: HapticTimerViewModel
     @StateObject private var settingsViewModel = SettingsViewModel()
 
+    private let minFontSize: CGFloat = 8
+    private let maxFontSize: CGFloat = 256
+    private let fontSizeStep: CGFloat = 2
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -28,7 +32,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Font:")
                     Spacer()
-                    Picker("Font", selection: $settingsViewModel.selectedFont) {
+                    Picker("Font", selection: $appState.fontName) {
                         ForEach(settingsViewModel.availableFonts, id: \.self) { font in
                             Text(font).tag(font)
                         }
@@ -37,25 +41,24 @@ struct SettingsView: View {
                 .padding(.horizontal)
                 
                 HStack {
-                    Text("Font Size: \(Int(settingsViewModel.fontSize))")
+                    Text("Font Size: \(Int(appState.fontSize))")
                     Spacer()
-                    Button(action: { settingsViewModel.decreaseFontSize() }) {
+                    Button(action: { decreaseFontSize() }) {
                         Image(systemName: "minus.circle")
                     }
-                    Button(action: { settingsViewModel.increaseFontSize() }) {
+                    Button(action: { increaseFontSize() }) {
                         Image(systemName: "plus.circle")
                     }
                 }
                 .padding(.horizontal)
-                
-                
                 
                 Text("01:23")
                     .font(
                         .custom(
                             appState.fontName,
                             size: appState.fontSize * appState
-                                .scale)
+                                .scale
+                        )
                     )
                     .foregroundColor(.white)
                     .padding(.vertical)
@@ -69,6 +72,18 @@ struct SettingsView: View {
         .background(Color.backgroundColor)
         .foregroundColor(.foregroundColor)
         .navigationTitle("Settings")
+    }
+}
+
+extension SettingsView {
+    
+    
+    func increaseFontSize() {
+        appState.fontSize = min(appState.fontSize + fontSizeStep, maxFontSize)
+    }
+    
+    func decreaseFontSize() {
+        appState.fontSize = max(appState.fontSize - fontSizeStep, minFontSize)
     }
 }
 

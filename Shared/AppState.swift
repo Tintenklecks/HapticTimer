@@ -9,7 +9,7 @@ class AppState: ObservableObject {
     
     #endif
     
-    @AppStorage("fontName") var fontName: String = "SF Pro"
+    @AppStorage("fontName") var fontName: String = "Arial"
     @AppStorage("fontSize") var fontSize: Double = 64
     
 

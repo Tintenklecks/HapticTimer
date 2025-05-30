@@ -1,5 +1,7 @@
 import SwiftUI
-//import WatchKit
+#if os(watchOS)
+import WatchKit
+#endif
 
 struct HapticTimerView: View {
     @EnvironmentObject var appState: AppState
@@ -84,6 +86,16 @@ struct HapticTimerView: View {
                     SettingsView(viewModel: viewModel)
                 }
             }
+            #if os(watchOS)
+            // Keep the timer view active when running
+            .onReceive(NotificationCenter.default.publisher(for: WKApplication.didBecomeActiveNotification)) { _ in
+                print("App became active")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: WKApplication.willResignActiveNotification)) { _ in
+                print("App will resign active")
+                // The extended runtime session should keep the timer running
+            }
+            #endif
         }
     }
 

@@ -3,6 +3,7 @@ import Foundation
 import WatchKit
 #else
 import UIKit
+import AVFoundation
 #endif
 
 class HapticService {
@@ -11,9 +12,59 @@ class HapticService {
     #if os(iOS) || os(iPadOS)
     private var impactGenerator: UIImpactFeedbackGenerator?
     private var notificationGenerator: UINotificationFeedbackGenerator?
+    private var audioPlayers: [String: AVAudioPlayer] = [:]
     #endif
     
-    private init() {}
+    private init() {
+        #if os(iOS) || os(iPadOS)
+        setupAudioPlayers()
+        #endif
+    }
+    
+    #if os(iOS) || os(iPadOS)
+    private func setupAudioPlayers() {
+        // Load different sound files for different intervals
+        let soundFiles = [
+            "tick_1s": "tick_1s.wav",    // Lightest sound for 1-second intervals
+            "tick_5s": "tick_5s.wav",    // Light sound for 5-second intervals
+            "tick_10s": "tick_10s.wav",  // Medium sound for 10-second intervals
+            "tick_60s": "tick_60s.wav",  // Strongest sound for minute intervals
+            "tick_end": "tick_end.wav"   // Special sound for timer end
+        ]
+        
+        for (key, filename) in soundFiles {
+            guard let soundURL = Bundle.main.url(forResource: filename, withExtension: nil) else {
+                print("Could not find sound file: \(filename)")
+                continue
+            }
+            
+            do {
+                let player = try AVAudioPlayer(contentsOf: soundURL)
+                player.prepareToPlay()
+                
+                // Set different volumes for different intervals
+                switch key {
+                case "tick_1s":
+                    player.volume = 0.05  // 5% volume for 1-second intervals
+                case "tick_5s":
+                    player.volume = 0.1   // 10% volume for 5-second intervals
+                case "tick_10s":
+                    player.volume = 0.2   // 20% volume for 10-second intervals
+                case "tick_60s":
+                    player.volume = 0.3   // 30% volume for minute intervals
+                case "tick_end":
+                    player.volume = 0.4   // 40% volume for timer end
+                default:
+                    player.volume = 0.1   // Default volume
+                }
+                
+                audioPlayers[key] = player
+            } catch {
+                print("Could not create audio player for \(filename): \(error)")
+            }
+        }
+    }
+    #endif
     
     func playHaptic(for secondsRemaining: Int) {
         #if os(watchOS)
@@ -23,12 +74,19 @@ class HapticService {
         #else
         if secondsRemaining == 1 {
             playNotificationHaptic(.success)
-        } else if secondsRemaining % 60 == 0 {
+            playSound("tick_1s")
+        } else if secondsRemaining % 60 == 0, Intervals.oneMinute.isActive {
             playImpactHaptic(.heavy)
-        } else if secondsRemaining % 10 == 0 {
+            playSound("tick_60s")
+        } else if secondsRemaining % 10 == 0, Intervals.tenSeconds.isActive {
             playImpactHaptic(.medium)
-        } else if secondsRemaining % 5 == 0 {
+            playSound("tick_10s")
+        } else if secondsRemaining % 5 == 0, Intervals.fiveSeconds.isActive {
             playImpactHaptic(.light)
+            playSound("tick_5s")
+        } else if Intervals.oneSecond.isActive {
+            playImpactHaptic(.light)
+            playSound("tick_1s")
         }
         #endif
     }
@@ -45,6 +103,7 @@ class HapticService {
         }
         #else
         playNotificationHaptic(.error)
+        playSound("tick_end")
         #endif
     }
     
@@ -63,17 +122,30 @@ class HapticService {
     }
     #else
     private func playImpactHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        impactGenerator = UIImpactFeedbackGenerator(style: style)
-        impactGenerator?.prepare()
-        impactGenerator?.impactOccurred()
-        impactGenerator = nil
+        DispatchQueue.main.async {
+            self.impactGenerator = UIImpactFeedbackGenerator(style: style)
+            self.impactGenerator?.prepare()
+            self.impactGenerator?.impactOccurred()
+            self.impactGenerator = nil
+        }
     }
     
     private func playNotificationHaptic(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        notificationGenerator = UINotificationFeedbackGenerator()
-        notificationGenerator?.prepare()
-        notificationGenerator?.notificationOccurred(type)
-        notificationGenerator = nil
+        DispatchQueue.main.async {
+            self.notificationGenerator = UINotificationFeedbackGenerator()
+            self.notificationGenerator?.prepare()
+            self.notificationGenerator?.notificationOccurred(type)
+            self.notificationGenerator = nil
+        }
+    }
+    
+    private func playSound(_ key: String) {
+        DispatchQueue.main.async {
+            if let player = self.audioPlayers[key] {
+                player.currentTime = 0
+                player.play()
+            }
+        }
     }
     #endif
 } 

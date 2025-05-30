@@ -2,12 +2,18 @@ import Combine
 import Foundation
 import SwiftUI
 
-// import WatchKit
+#if os(watchOS)
+import WatchKit
+#endif
 
 class HapticTimerViewModel: NSObject, ObservableObject {
     @Published var timeRemaining: Int = 60
     @Published var isRunning = false
     @AppStorage("initialtime") var initialTime: TimeInterval = 60
+    
+    private var intInitialTime: Int {
+        Int(initialTime.rounded())
+    }
 
     private var endDate: Date?
     private var lastUpdateTime: Date?
@@ -16,14 +22,14 @@ class HapticTimerViewModel: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        timeRemaining = Int(initialTime)
+        timeRemaining = intInitialTime
     }
 
     var startButtonText: String {
         if isRunning {
             return "Pause"
         } else {
-            if timeRemaining > 0 && timeRemaining < Int(initialTime) {
+            if timeRemaining > 0 && timeRemaining < intInitialTime {
                 return "Resume"
             } else {
                 return "Start"
@@ -74,6 +80,11 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         updateTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.updateTime()
         }
+        
+        // Ensure timer runs even when scrolling or other UI interactions occur
+        if let timer = updateTimer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
     }
 
     func pauseTimer() {
@@ -104,7 +115,7 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         updateTimer = nil
         endDate = nil
         lastUpdateTime = nil
-        timeRemaining = Int(initialTime)
+        timeRemaining = intInitialTime
 #if os(watchOS)
         endExtendedSession()
 #endif

@@ -3,22 +3,47 @@ import SwiftUI
 struct HapticTimerView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var viewModel = HapticTimerViewModel()
+    
     @AppStorage("initialtime") var initialTime: TimeInterval = 60
     
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
                 Color.backgroundColor.ignoresSafeArea()
-                
-                VStack {
+                HStack {
+                    if UIDevice.current.userInterfaceIdiom == .pad {
+                        Spacer()
+                    }
+                    Text("Haptic Coutdown")
                     Spacer()
-                    
+                }
+                .padding()
+                .font(.largeTitle)
+
+                VStack {
+                    HStack {
+                        Spacer()
+                        VStack {
+                            Text("\n\nAlso available as")
+                            Image("watch")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 100)
+                            Text("**Watch App**")
+                        }
+                    }
+                    .offset(y: 60)
+                    .font(.caption)
+
+                    Spacer()
+
                     Text(timeString(from: viewModel.timeRemaining))
                         .font(
                             .custom(
                                 appState.fontName,
                                 size: appState.fontSize * appState
-                                    .scale)
+                                    .scale
+                            )
                         )
                         .foregroundColor(.white)
                         .padding(.vertical)
@@ -44,8 +69,9 @@ struct HapticTimerView: View {
                     }
                 }
             }
+            .foregroundStyle(.white)
             .navigationTitle("Haptic Coutdown")
-//            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: SettingsView(viewModel: viewModel)) {
