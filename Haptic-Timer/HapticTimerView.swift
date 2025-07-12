@@ -10,15 +10,6 @@ struct HapticTimerView: View {
         NavigationStack {
             ZStack(alignment: .top) {
                 Color.backgroundColor.ignoresSafeArea()
-                HStack {
-                    if UIDevice.current.userInterfaceIdiom == .pad {
-                        Spacer()
-                    }
-                    Text("Haptic Coutdown")
-                    Spacer()
-                }
-                .padding()
-                .font(.largeTitle)
 
                 VStack {
                     HStack {
@@ -70,8 +61,8 @@ struct HapticTimerView: View {
                 }
             }
             .foregroundStyle(.white)
-            .navigationTitle("Haptic Coutdown")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Haptic Countdown")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: SettingsView(viewModel: viewModel)) {
