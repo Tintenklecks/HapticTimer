@@ -62,7 +62,7 @@ struct HapticTimerView: View {
             }
             .foregroundStyle(.white)
             .navigationTitle("Haptic Countdown")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: SettingsView(viewModel: viewModel)) {
