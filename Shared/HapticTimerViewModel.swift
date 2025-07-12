@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import SwiftUI
+import UserNotifications
 
 #if os(watchOS)
 import WatchKit
@@ -74,6 +75,8 @@ class HapticTimerViewModel: NSObject, ObservableObject {
 
 #if os(watchOS)
         startExtendedSession()
+        // Also schedule notifications as a fallback
+        scheduleLocalNotifications()
 #endif
 
         // Start a timer to update the UI every second
@@ -107,6 +110,9 @@ class HapticTimerViewModel: NSObject, ObservableObject {
 #if os(watchOS)
         endExtendedSession()
 #endif
+        
+        // Clear scheduled notifications
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
     func stopTimer() {
@@ -119,6 +125,9 @@ class HapticTimerViewModel: NSObject, ObservableObject {
 #if os(watchOS)
         endExtendedSession()
 #endif
+        
+        // Clear scheduled notifications
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
 #if os(watchOS)
@@ -129,7 +138,9 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         // Create and start new session
         extendedSession = WKExtendedRuntimeSession()
         extendedSession?.delegate = self
-        extendedSession?.start()
+        extendedSession?.start(at: Date())
+        
+        print("Starting extended runtime session")
     }
 
     private func endExtendedSession() {
@@ -173,6 +184,68 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         timeRemaining = Int(time + 0.1)
         initialTime = time
     }
+    
+    // MARK: - Local Notification Fallback
+    private func scheduleLocalNotifications() {
+        // Clear existing notifications
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        
+        guard timeRemaining > 0 else { return }
+        
+        let center = UNUserNotificationCenter.current()
+        
+        // Request permission
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if granted {
+                self.createTimerNotifications()
+            }
+        }
+    }
+    
+    private func createTimerNotifications() {
+        let intervals = [1, 5, 10, 60] // seconds
+        
+        for interval in intervals.reversed() {
+            if timeRemaining >= interval {
+                let content = UNMutableNotificationContent()
+                content.title = "Haptic Timer"
+                content.body = "\(interval) second\(interval == 1 ? "" : "s") remaining"
+                content.sound = .default
+                
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: TimeInterval(timeRemaining - interval),
+                    repeats: false
+                )
+                
+                let request = UNNotificationRequest(
+                    identifier: "timer-\(interval)",
+                    content: content,
+                    trigger: trigger
+                )
+                
+                UNUserNotificationCenter.current().add(request)
+            }
+        }
+        
+        // Final notification
+        let finalContent = UNMutableNotificationContent()
+        finalContent.title = "Haptic Timer"
+        finalContent.body = "Timer finished!"
+        finalContent.sound = .default
+        
+        let finalTrigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: TimeInterval(timeRemaining),
+            repeats: false
+        )
+        
+        let finalRequest = UNNotificationRequest(
+            identifier: "timer-finished",
+            content: finalContent,
+            trigger: finalTrigger
+        )
+        
+        UNUserNotificationCenter.current().add(finalRequest)
+    }
 }
 
 #if os(watchOS)
@@ -192,10 +265,15 @@ extension HapticTimerViewModel: WKExtendedRuntimeSessionDelegate {
     ) {
         print("Extended runtime session invalidated with reason: \(reason)")
 
-        // If session was invalidated but timer should still be running, try to start a new session
         DispatchQueue.main.async {
-            if self.isRunning, self.extendedSession == nil {
+            if self.isRunning {
+                // Try to restart session immediately
                 self.startExtendedSession()
+                
+                // If that fails, fall back to local notifications
+                if self.extendedSession == nil {
+                    self.scheduleLocalNotifications()
+                }
             }
         }
     }
