@@ -10,7 +10,9 @@ import WatchKit
 class HapticTimerViewModel: NSObject, ObservableObject {
     @Published var timeRemaining: Int = 60
     @Published var isRunning = false
+    @Published var showNotificationExplanationDialog = false
     @AppStorage("initialtime") var initialTime: TimeInterval = 60
+    @AppStorage("hasShownNotificationExplanation") private var hasShownNotificationExplanation = false
     
     private var intInitialTime: Int {
         Int(initialTime.rounded())
@@ -192,6 +194,14 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         
         guard timeRemaining > 0 else { return }
         
+        // Check if we need to show explanation dialog first
+        if !hasShownNotificationExplanation {
+            DispatchQueue.main.async {
+                self.showNotificationExplanationDialog = true
+            }
+            return
+        }
+        
         let center = UNUserNotificationCenter.current()
         
         // Request permission
@@ -200,6 +210,24 @@ class HapticTimerViewModel: NSObject, ObservableObject {
                 self.createTimerNotifications()
             }
         }
+    }
+    
+    func requestNotificationPermissionAfterExplanation() {
+        hasShownNotificationExplanation = true
+        showNotificationExplanationDialog = false
+        
+        let center = UNUserNotificationCenter.current()
+        
+        // Request permission
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if granted {
+                self.createTimerNotifications()
+            }
+        }
+    }
+    
+    func cancelNotificationPermissionRequest() {
+        showNotificationExplanationDialog = false
     }
     
     private func createTimerNotifications() {

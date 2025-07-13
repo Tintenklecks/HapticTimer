@@ -76,6 +76,16 @@ struct HapticTimerView: View {
                     viewModel.setTime(initialTime)
                 }
             }
+            .alert("Enable Notifications", isPresented: $viewModel.showNotificationExplanationDialog) {
+                Button("Allow") {
+                    viewModel.requestNotificationPermissionAfterExplanation()
+                }
+                Button("Cancel", role: .cancel) {
+                    viewModel.cancelNotificationPermissionRequest()
+                }
+            } message: {
+                Text("To keep your WatchOS app running and deliver haptic feedback even when your watch goes to sleep, this app needs notification permissions. This ensures your timer continues working in the background.")
+            }
         }
     }
     
