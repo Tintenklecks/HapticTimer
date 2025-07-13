@@ -4,12 +4,11 @@
 <dict>
 	<key></key>
 	<string></string>
-	<key>ITSAppUsesNonExemptEncryption - 2</key>
+	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>audio</string>
-		<string>fetch</string>
+		<string>audio</string
 	</array>
 </dict>
 </plist>
