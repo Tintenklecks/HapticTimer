@@ -1,6 +1,7 @@
 import SwiftUI
+
 #if os(watchOS)
-import WatchKit
+    import WatchKit
 #endif
 
 struct HapticTimerView: View {
@@ -11,9 +12,9 @@ struct HapticTimerView: View {
     var timeHeight: Double {
         appState.scaled(64)
     }
-    
-    init(    ) {
-        
+
+    init() {
+
     }
 
     var body: some View {
@@ -31,6 +32,8 @@ struct HapticTimerView: View {
                             appState.path.append("SettingsView")
                         }
                         .offset(x: -12, y: 8)
+                        .opacity(viewModel.isRunning ? 0 : 1)
+
                 }
                 Spacer()
 
@@ -39,7 +42,7 @@ struct HapticTimerView: View {
                         .system(
                             size: timeHeight,
                             weight: .regular
-                        ) // , design: .monospaced)
+                        )  // , design: .monospaced)
                     )
                     .foregroundColor(.white)
                     .padding(.vertical)
@@ -87,16 +90,24 @@ struct HapticTimerView: View {
                 }
             }
             #if os(watchOS)
-            // Keep the timer view active when running
-            .onReceive(NotificationCenter.default.publisher(for: WKApplication.didBecomeActiveNotification)) { _ in
-                print("App became active")
-            }
-            .onReceive(NotificationCenter.default.publisher(for: WKApplication.willResignActiveNotification)) { _ in
-                print("App will resign active")
-                // The extended runtime session should keep the timer running
-            }
+                // Keep the timer view active when running
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: WKApplication.didBecomeActiveNotification)
+                ) { _ in
+                    print("App became active")
+                }
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: WKApplication.willResignActiveNotification)
+                ) { _ in
+                    print("App will resign active")
+                    // The extended runtime session should keep the timer running
+                }
             #endif
-            .alert("Enable Notifications", isPresented: $viewModel.showNotificationExplanationDialog) {
+            .alert(
+                "Enable Notifications", isPresented: $viewModel.showNotificationExplanationDialog
+            ) {
                 Button("Allow") {
                     viewModel.requestNotificationPermissionAfterExplanation()
                 }
@@ -104,7 +115,9 @@ struct HapticTimerView: View {
                     viewModel.cancelNotificationPermissionRequest()
                 }
             } message: {
-                Text("To keep your WatchOS app running and deliver haptic feedback even when your watch goes to sleep, this app needs notification permissions. This ensures your timer continues working in the background.")
+                Text(
+                    "To keep your WatchOS app running and deliver haptic feedback even when your watch goes to sleep, this app needs notification permissions. This ensures your timer continues working in the background."
+                )
             }
         }
     }

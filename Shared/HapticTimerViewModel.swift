@@ -4,7 +4,8 @@ import SwiftUI
 import UserNotifications
 
 #if os(watchOS)
-import WatchKit
+    import WatchKit
+    import HealthKit
 #endif
 
 class HapticTimerViewModel: NSObject, ObservableObject {
@@ -12,8 +13,9 @@ class HapticTimerViewModel: NSObject, ObservableObject {
     @Published var isRunning = false
     @Published var showNotificationExplanationDialog = false
     @AppStorage("initialtime") var initialTime: TimeInterval = 60
-    @AppStorage("hasShownNotificationExplanation") private var hasShownNotificationExplanation = false
-    
+    @AppStorage("hasShownNotificationExplanation") private var hasShownNotificationExplanation =
+        false
+
     private var intInitialTime: Int {
         Int(initialTime.rounded())
     }
@@ -63,9 +65,10 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         }
     }
 
-#if os(watchOS)
-    private var extendedSession: WKExtendedRuntimeSession?
-#endif
+    #if os(watchOS)
+        private var workoutSession: HKWorkoutSession?
+        private let healthStore = HKHealthStore()
+    #endif
 
     func startTimer() {
         guard !isRunning else { return }
@@ -75,17 +78,17 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         endDate = Date().addingTimeInterval(TimeInterval(timeRemaining))
         lastUpdateTime = Date()
 
-#if os(watchOS)
-        startExtendedSession()
-        // Also schedule notifications as a fallback
-        scheduleLocalNotifications()
-#endif
+        #if os(watchOS)
+            startWorkoutSession()
+            // Also schedule notifications as a fallback
+            scheduleLocalNotifications()
+        #endif
 
         // Start a timer to update the UI every second
         updateTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.updateTime()
         }
-        
+
         // Ensure timer runs even when scrolling or other UI interactions occur
         if let timer = updateTimer {
             RunLoop.main.add(timer, forMode: .common)
@@ -109,10 +112,10 @@ class HapticTimerViewModel: NSObject, ObservableObject {
             }
         }
 
-#if os(watchOS)
-        endExtendedSession()
-#endif
-        
+        #if os(watchOS)
+            endWorkoutSession()
+        #endif
+
         // Clear scheduled notifications
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
@@ -124,32 +127,60 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         endDate = nil
         lastUpdateTime = nil
         timeRemaining = intInitialTime
-#if os(watchOS)
-        endExtendedSession()
-#endif
-        
+        #if os(watchOS)
+            endWorkoutSession()
+        #endif
+
         // Clear scheduled notifications
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
-#if os(watchOS)
-    private func startExtendedSession() {
-        // End any existing session
-        endExtendedSession()
+    #if os(watchOS)
+        private func startWorkoutSession() {
+            guard HKHealthStore.isHealthDataAvailable() else { return }
 
-        // Create and start new session
-        extendedSession = WKExtendedRuntimeSession()
-        extendedSession?.delegate = self
-        extendedSession?.start(at: Date())
-        
-        print("Starting extended runtime session")
-    }
+            // Request authorization first if needed
+            let typesToShare: Set = [HKObjectType.workoutType()]
+            let typesToRead: Set = [HKObjectType.workoutType()]
 
-    private func endExtendedSession() {
-        extendedSession?.invalidate()
-        extendedSession = nil
-    }
-#endif
+            healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) {
+                [weak self] success, error in
+                guard success else {
+                    print("HealthKit authorization failed: \(String(describing: error))")
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    self?.createAndStartWorkoutSession()
+                }
+            }
+        }
+
+        private func createAndStartWorkoutSession() {
+            // End any existing session
+            endWorkoutSession()
+
+            let configuration = HKWorkoutConfiguration()
+            configuration.activityType = .other
+            configuration.locationType = .indoor
+
+            do {
+                workoutSession = try HKWorkoutSession(
+                    healthStore: healthStore, configuration: configuration)
+                workoutSession?.delegate = self
+                workoutSession?.startActivity(with: Date())
+                print("Starting workout session")
+            } catch {
+                print("Failed to start workout session: \(error)")
+            }
+        }
+
+        private func endWorkoutSession() {
+            workoutSession?.end()
+            workoutSession = nil
+            print("Ending workout session")
+        }
+    #endif
 
     private func updateTime() {
         guard let endDate = endDate else { return }
@@ -186,14 +217,14 @@ class HapticTimerViewModel: NSObject, ObservableObject {
         timeRemaining = Int(time + 0.1)
         initialTime = time
     }
-    
+
     // MARK: - Local Notification Fallback
     private func scheduleLocalNotifications() {
         // Clear existing notifications
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
-        
+
         guard timeRemaining > 0 else { return }
-        
+
         // Check if we need to show explanation dialog first
         if !hasShownNotificationExplanation {
             DispatchQueue.main.async {
@@ -201,9 +232,9 @@ class HapticTimerViewModel: NSObject, ObservableObject {
             }
             return
         }
-        
+
         let center = UNUserNotificationCenter.current()
-        
+
         // Request permission
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if granted {
@@ -211,13 +242,13 @@ class HapticTimerViewModel: NSObject, ObservableObject {
             }
         }
     }
-    
+
     func requestNotificationPermissionAfterExplanation() {
         hasShownNotificationExplanation = true
         showNotificationExplanationDialog = false
-        
+
         let center = UNUserNotificationCenter.current()
-        
+
         // Request permission
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if granted {
@@ -225,85 +256,85 @@ class HapticTimerViewModel: NSObject, ObservableObject {
             }
         }
     }
-    
+
     func cancelNotificationPermissionRequest() {
         showNotificationExplanationDialog = false
     }
-    
+
     private func createTimerNotifications() {
-        let intervals = [1, 5, 10, 60] // seconds
-        
+        let intervals = [1, 5, 10, 60]  // seconds
+
         for interval in intervals.reversed() {
-            if timeRemaining >= interval {
+            if timeRemaining > interval {
                 let content = UNMutableNotificationContent()
                 content.title = "Haptic Timer"
                 content.body = "\(interval) second\(interval == 1 ? "" : "s") remaining"
                 content.sound = .default
-                
+
                 let trigger = UNTimeIntervalNotificationTrigger(
                     timeInterval: TimeInterval(timeRemaining - interval),
                     repeats: false
                 )
-                
+
                 let request = UNNotificationRequest(
                     identifier: "timer-\(interval)",
                     content: content,
                     trigger: trigger
                 )
-                
+
                 UNUserNotificationCenter.current().add(request)
             }
         }
-        
+
         // Final notification
         let finalContent = UNMutableNotificationContent()
         finalContent.title = "Haptic Timer"
         finalContent.body = "Timer finished!"
         finalContent.sound = .default
-        
+
         let finalTrigger = UNTimeIntervalNotificationTrigger(
             timeInterval: TimeInterval(timeRemaining),
             repeats: false
         )
-        
+
         let finalRequest = UNNotificationRequest(
             identifier: "timer-finished",
             content: finalContent,
             trigger: finalTrigger
         )
-        
+
         UNUserNotificationCenter.current().add(finalRequest)
     }
 }
 
 #if os(watchOS)
-// Add extension for WKExtendedRuntimeSession delegate
-extension HapticTimerViewModel: WKExtendedRuntimeSessionDelegate {
-    func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
-        print("Extended runtime session started")
-    }
+    // Add extension for HKWorkoutSession delegate
+    extension HapticTimerViewModel: HKWorkoutSessionDelegate {
+        func workoutSession(
+            _ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState,
+            from fromState: HKWorkoutSessionState, date: Date
+        ) {
+            print("Workout session state changed to: \(toState.rawValue)")
 
-    func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {
-        print("Extended runtime session will expire")
-    }
+            if toState == .ended {
+                print("Workout session ended")
+            }
+        }
 
-    func extendedRuntimeSession(
-        _ extendedRuntimeSession: WKExtendedRuntimeSession,
-        didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason, error: Error?
-    ) {
-        print("Extended runtime session invalidated with reason: \(reason)")
+        func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+            print("Workout session failed with error: \(error)")
 
-        DispatchQueue.main.async {
-            if self.isRunning {
-                // Try to restart session immediately
-                self.startExtendedSession()
-                
-                // If that fails, fall back to local notifications
-                if self.extendedSession == nil {
-                    self.scheduleLocalNotifications()
+            DispatchQueue.main.async {
+                if self.isRunning {
+                    // Try to restart session immediately
+                    self.startWorkoutSession()
+
+                    // If that fails, fall back to local notifications
+                    if self.workoutSession == nil {
+                        self.scheduleLocalNotifications()
+                    }
                 }
             }
         }
     }
-}
 #endif
