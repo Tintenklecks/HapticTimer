@@ -4,13 +4,8 @@
 <dict>
 	<key>UIBackgroundModes</key>
 	<array/>
-	<key>NSHealthShareUsageDescription</key>
-	<string>This app uses HealthKit to run workout sessions, keeping the app active during timers.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>This app uses HealthKit to run workout sessions, keeping the app active during timers.</string>
 	<key>WKBackgroundModes</key>
 	<array>
-		<string>physical-therapy</string>
 		<string>workout-processing</string>
 	</array>
 </dict>

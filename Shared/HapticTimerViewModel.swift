@@ -12,6 +12,7 @@ class HapticTimerViewModel: NSObject, ObservableObject {
     @Published var timeRemaining: Int = 60
     @Published var isRunning = false
     @Published var showNotificationExplanationDialog = false
+    @Published var showFeedbackAlert = false
     @AppStorage("initialtime") var initialTime: TimeInterval = 60
     @AppStorage("hasShownNotificationExplanation") private var hasShownNotificationExplanation =
         false
@@ -28,6 +29,14 @@ class HapticTimerViewModel: NSObject, ObservableObject {
     override init() {
         super.init()
         timeRemaining = intInitialTime
+
+        #if os(iOS) || os(iPadOS)
+            hapticService.onFeedbackFailed = { [weak self] in
+                DispatchQueue.main.async {
+                    self?.showFeedbackAlert = true
+                }
+            }
+        #endif
     }
 
     var startButtonText: String {
@@ -151,12 +160,18 @@ class HapticTimerViewModel: NSObject, ObservableObject {
                 }
 
                 DispatchQueue.main.async {
-                    self?.createAndStartWorkoutSession()
+                    // Check if we are still running before starting the session
+                    // This prevents a race condition where the user might have stopped
+                    // the timer while authorization was happening
+                    guard let self = self, self.isRunning else { return }
+                    self.createAndStartWorkoutSession()
                 }
             }
         }
 
         private func createAndStartWorkoutSession() {
+            guard isRunning else { return }
+
             // End any existing session
             endWorkoutSession()
 
@@ -210,6 +225,10 @@ class HapticTimerViewModel: NSObject, ObservableObject {
             updateTimer?.invalidate()
             updateTimer = nil
             hapticService.playTimerEndHaptic()
+
+            #if os(watchOS)
+                endWorkoutSession()
+            #endif
         }
     }
 
